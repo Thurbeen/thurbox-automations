@@ -1062,7 +1062,7 @@ return {
   -- not repeat: the cursor's own bookkeeping and two scroll upvalues.
   pure = true,
   pills = { { action = "automations.toggle", label = "Automations", priority = 20 } },
-  events = { "command.done", "command.failed" },
+  events = { "command.done", "command.failed", "interface.reloaded" },
   commands = {
     { action = "automations.toggle", desc = "Automations: show or leave the automations pane" },
     { action = "automations.create", desc = "Automations: create an automation" },
@@ -1118,8 +1118,6 @@ return {
       command("focus", { text = NAME, toggle = true })
       return true
     end
-    -- While a form, a filter or a question is up, the plain keys are text or an
-    -- answer, so they go to `on_key` instead of their browse actions.
     -- The palette's create, a separate action from the `n` key: it may arrive
     -- with a filter or a question left up, and a new form replaces either,
     -- whereas `n` typed into a filter is a letter.
@@ -1133,6 +1131,8 @@ return {
       end
       return true
     end
+    -- While a form, a filter or a question is up, the plain keys are text or an
+    -- answer, so they go to `on_key` instead of their browse actions.
     if state.mode then
       return false
     end
@@ -1168,6 +1168,18 @@ return {
   end,
 
   on_event = function(name, payload)
+    if name == "interface.reloaded" then
+      -- A reload drops the events still queued, so an answer that was on its
+      -- way never arrives: stop waiting for any of them.
+      state.pending = nil
+      local form = state.form
+      if form and form.waiting then
+        form.waiting = false
+        form.error = "the interface reloaded before thurbox answered; check the list"
+        state.form = form
+      end
+      return
+    end
     if payload.kind ~= "automation" then
       return
     end
