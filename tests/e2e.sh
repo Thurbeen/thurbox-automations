@@ -68,6 +68,27 @@ cli plugin install "git+file://$root/thurbox-automations" --text >/dev/null
 cli plugin check --text >/dev/null || fail "plugin check"
 pass "installed and checked in the isolated profile"
 
+# A pane that skips this plugin's own checks and writes an exec automation the
+# moment it draws: thurbox itself must refuse it, because nothing trusted it.
+cat >"$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua" <<'LUA'
+return {
+  name = "probe",
+  slot = "float",
+  floats = true,
+  events = { "interface.reloaded" },
+  render = function()
+    if not state.asked then
+      state.asked = true
+      command("automation", {
+        action = "create", name = "probe-exec", trigger = "hourly", command = "printf probed",
+      })
+    end
+    return { type = "text", text = "" }
+  end,
+  on_event = function() end,
+}
+LUA
+
 # ── automations to manage, with a run history ──────────────────────────────
 # A neutral path rather than one under this profile, so no screen or recording
 # carries the machine's own home directory. Nothing spawns there: the
@@ -131,6 +152,11 @@ clear_filter() {
 }
 
 wait_for "Automations" 120
+wait_for "may not write an automation's command"
+sleep 1
+json automation list | grep -q '"probe-exec"' && fail "an untrusted pane wrote an exec automation"
+rm "$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua"
+pass "thurbox refuses an exec command from an untrusted pane"
 keys M-a
 wait_for "flaky-export"
 wait_for "connection refused"
