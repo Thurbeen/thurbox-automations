@@ -154,7 +154,7 @@ h.test("it is reachable by a key, a pill and the palette", function()
   for _, entry in ipairs(pane.commands) do
     palette[entry.action] = true
   end
-  assert(palette["automations.toggle"] and palette["automations.new"], "palette entries")
+  assert(palette["automations.toggle"] and palette["automations.create"], "palette entries")
   h.action("automations.toggle")
   local issued = only_command()
   h.eq(issued.kind, "focus")
@@ -494,6 +494,80 @@ h.test("an older thurbox: management is read-only and says why", function()
   h.press("esc")
   h.press("space")
   h.eq(only_command().args.flag, false)
+end)
+
+-- ── found in review ────────────────────────────────────────────────────────
+
+h.test("thurbox 2.56.5 run rows carry no id, and the pane still draws them", function()
+  local old = sync()
+  old.trigger, old.next_run_at, old.command = nil, nil, nil
+  for _, run in ipairs(old.runs) do
+    run.id = nil
+  end
+  world({ automations = { old } })
+  local screen = h.screen(140, 40)
+  h.contains(screen, "connection refused")
+  h.press("tab")
+  h.press("j")
+  h.contains(h.screen(140, 40), "ok", "the second run is selectable")
+end)
+
+h.test("enter does not answer the delete question", function()
+  world()
+  h.press("x")
+  h.press("enter")
+  h.eq(#h.commands(), 0, "only y deletes")
+end)
+
+h.test("the palette's create works whatever mode the pane was left in", function()
+  world()
+  h.press("/")
+  h.action("automations.create")
+  h.contains(h.screen(140, 40), "New automation")
+end)
+
+h.test("each automation opens on its newest run", function()
+  local other = sync()
+  other.id, other.name = 5, "sync-other"
+  for i, run in ipairs(other.runs) do
+    run.id = 50 + i
+  end
+  world({ automations = { sync(), other } })
+  h.press("tab")
+  h.press("j")
+  h.press("j") -- sync-tasks' oldest run
+  h.press("tab")
+  h.press("j") -- sync-other
+  h.contains(h.screen(140, 40), "Run #51", "its newest, not the row the other was left at")
+end)
+
+h.test("a save whose answer never comes can still be left", function()
+  world()
+  h.press("n")
+  h.type("lost")
+  h.press("enter")
+  h.commands()
+  h.contains(h.screen(140, 40), "saving")
+  h.press("esc")
+  h.absent(h.screen(140, 40), "New automation", "esc leaves a waiting form")
+end)
+
+h.test("duplicating a send whose session is gone asks for a new one", function()
+  world({ sessions = { { id = "s2", name = "other-work", repo = "app" } } })
+  h.press("j")
+  h.press("j") -- standup-ping, sends to s1, which is gone
+  h.press("c")
+  h.press("enter")
+  h.eq(#h.commands(), 0, "never sent to a session nobody chose")
+  h.contains(h.screen(140, 40), "session")
+end)
+
+h.test("shift+tab moves between the list and the runs too", function()
+  world()
+  h.press("j")
+  h.press("backtab")
+  h.press("j")
+  h.contains(h.screen(140, 40), "Run #32", "the runs had focus")
 end)
 
 -- ── run history and its log ─────────────────────────────────────────────────

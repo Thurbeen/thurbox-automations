@@ -6,7 +6,7 @@
 #
 # THURBOX_REPO is a directory holding thurbox's `ui/` — a checkout, or
 # `git archive <tag> ui | tar x` somewhere outside this working copy. CI pins
-# the tag (THURBOX_TAG in .github/workflows/ci.yml).
+# the tag (THURBOX_TAG in .github/workflows/check.yml).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"

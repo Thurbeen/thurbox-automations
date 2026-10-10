@@ -98,8 +98,10 @@ local function auto_id(row)
   return "a" .. row.id
 end
 
+--- A run's identity. thurbox before the create/edit release publishes runs
+--- without an id, so the start time stands in for one there.
 local function run_id(run)
-  return "r" .. run.id
+  return run.id and ("r" .. run.id) or ("t" .. tostring(run.started_at))
 end
 
 local function cursor()
@@ -114,8 +116,10 @@ local function runs_of(row)
   return model.filter_runs(row and row.runs or {}, state.run_filter or "all")
 end
 
+--- One cursor per automation, so each opens on its own newest run rather than
+--- on the row the previous one was left at.
 local function run_cursor(row)
-  return ui.cursor(RUNS, runs_of(row), { id = run_id })
+  return ui.cursor(RUNS .. "." .. (row and row.id or 0), runs_of(row), { id = run_id })
 end
 
 local function plural(n, word)
@@ -224,9 +228,14 @@ local function open_form(row, edit)
     f.base = field(row.base)
     f.agent = field(row.agent)
     f.command = field(row.command)
-    for index, session in ipairs(sessions()) do
-      if session.id == row.session then
-        form.session = index
+    if row.session then
+      -- A target that is gone is not quietly swapped for the first session:
+      -- the choice starts empty and must be made.
+      form.session = 0
+      for index, session in ipairs(sessions()) do
+        if session.id == row.session then
+          form.session = index
+        end
       end
     end
     form.session_id = row.session
@@ -275,6 +284,9 @@ local function form_options(form)
     if form.kind == "send" then
       local session = sessions()[form.session or 1]
       if not session then
+        if #sessions() > 0 then
+          return nil, "pick a session to send to with ◂ ▸"
+        end
         return nil, "no session to send to: start one, or pick another kind"
       end
       opts.session = session.id
@@ -336,7 +348,13 @@ local function form_key(key)
     return true
   end
   if form.waiting then
-    -- The answer is out; Esc now would look like a cancel that was not one.
+    -- The answer is out. Esc only stops waiting for it — the write may still
+    -- land, and the list will show it — so an answer lost to a reload cannot
+    -- hold the form up for good.
+    if key.key == "esc" then
+      state.form, state.mode = nil, nil
+      notice("stopped waiting; the list shows whether it was saved")
+    end
     return true
   end
   local name = key.key
@@ -417,7 +435,7 @@ local function confirm_key(key)
   if not ask then
     return true
   end
-  if key.key == "y" or key.key == "enter" then
+  if key.key == "y" then
     local row = find(ask.id)
     if not row then
       notice(ask.name .. " no longer exists; nothing was deleted")
@@ -723,7 +741,11 @@ local function detail_panel(row, width, height, focused)
   end
   local run = rc:item()
   if run and left >= 2 then
-    local title = "Run #" .. run.id .. " · " .. run.status .. " · " .. model.utc(run.started_at)
+    local title = (run.id and ("Run #" .. run.id) or "Run")
+      .. " · "
+      .. run.status
+      .. " · "
+      .. model.utc(run.started_at)
     children[#children + 1] = { type = "text", len = 1, text = { ui.rule(title, inner_w) } }
     left = left - 1
     local lines, total =
@@ -767,7 +789,13 @@ local function form_panel(form, width)
       if row.static then
         value = (model.session_label(form.session_id, sessions()))
       else
-        value = session and (session.name .. "   ◂ ▸") or "no sessions to send to"
+        if session then
+          value = session.name .. "   ◂ ▸"
+        elseif #sessions() > 0 then
+          value = "pick a session   ◂ ▸"
+        else
+          value = "no sessions to send to"
+        end
       end
     elseif row.key == "enabled" then
       value = (form.enabled and "yes" or "no") .. "   ◂ ▸"
@@ -1009,7 +1037,8 @@ local function browse(action)
       end
     end
     state.run_filter = model.RUN_FILTERS[at % #model.RUN_FILTERS + 1]
-    ui.reset(RUNS)
+    local row = selected()
+    ui.reset(RUNS .. "." .. (row and row.id or 0))
   elseif action == "automations.log_down" then
     scroll_log(1)
   elseif action == "automations.log_up" then
@@ -1036,7 +1065,7 @@ return {
   events = { "command.done", "command.failed" },
   commands = {
     { action = "automations.toggle", desc = "Automations: show or leave the automations pane" },
-    { action = "automations.new", desc = "Automations: create an automation" },
+    { action = "automations.create", desc = "Automations: create an automation" },
   },
   keys = {
     -- Every F-key is taken by the kernel or another official pane; Alt+A is
@@ -1091,11 +1120,21 @@ return {
     end
     -- While a form, a filter or a question is up, the plain keys are text or an
     -- answer, so they go to `on_key` instead of their browse actions.
+    -- The palette's create, a separate action from the `n` key: it may arrive
+    -- with a filter or a question left up, and a new form replaces either,
+    -- whereas `n` typed into a filter is a letter.
+    if action == "automations.create" then
+      if thurbox and thurbox.focus ~= NAME then
+        command("focus", { text = NAME })
+      end
+      if state.mode ~= "form" then
+        state.confirm, state.filter_field = nil, nil
+        open_form(nil, false)
+      end
+      return true
+    end
     if state.mode then
       return false
-    end
-    if action == "automations.new" and thurbox and thurbox.focus ~= NAME then
-      command("focus", { text = NAME })
     end
     return browse(action)
   end,
@@ -1121,7 +1160,7 @@ return {
       state.focus = state.focus == "runs" and "list" or "runs"
       return true
     end
-    if key.key == "tab" and key.shift then
+    if key.key == "backtab" then
       state.focus = state.focus == "runs" and "list" or "runs"
       return true
     end
