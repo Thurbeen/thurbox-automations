@@ -191,7 +191,8 @@ keys t
 wait_for "trusted · from thurbox-automations"
 keys Escape
 sleep 0.5
-keys M-a
+# Closing settings hands focus back to the pane it came from.
+screen | grep -qF "Automations (" || keys M-a
 wait_for "Automations ("
 pass "trusted through settings → Interface"
 
