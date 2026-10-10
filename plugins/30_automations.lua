@@ -1113,10 +1113,8 @@ return {
         state.filter = nil
         return true
       end
-      if state.notice then
-        state.notice = nil
-        return true
-      end
+      -- Declined, so Esc leaves the pane as it leaves any other.
+      state.notice = nil
       return false
     end
     if key.key == "enter" then
