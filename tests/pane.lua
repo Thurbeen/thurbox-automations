@@ -126,8 +126,11 @@ end
 
 -- ── states before there is anything to manage ──────────────────────────────
 
-h.test("the pane asks for no capability and runs nothing", function()
-  h.eq(h.pane().capabilities, nil, "capabilities")
+h.test("the pane asks only for run, and runs nothing", function()
+  -- `run` is what thurbox requires before a pane may write an exec
+  -- automation's command; the pane itself never calls it.
+  h.eq(#h.pane().capabilities, 1, "one capability")
+  h.eq(h.pane().capabilities[1], "run")
   h.eq(h.pane().name, "automations")
   h.eq(h.pane().slot, "center")
   h.eq(h.pane().pure, true, "a pure render")
@@ -347,7 +350,7 @@ local function to_field(label)
 end
 
 h.test("a new exec automation is created with typed fields", function()
-  world()
+  world({ granted = { run = true } })
   h.press("n")
   h.type("nightly-sync")
   to_field("Kind")
@@ -577,6 +580,40 @@ h.test("shift+tab moves between the list and the runs too", function()
   h.press("backtab")
   h.press("j")
   h.contains(h.screen(140, 40), "Run #32", "the runs had focus")
+end)
+
+h.test("untrusted, an exec automation is not written and the pane says how to trust it", function()
+  world()
+  h.press("n")
+  h.type("sync")
+  to_field("Kind")
+  h.press("right")
+  h.press("right")
+  to_field("Schedule")
+  h.type("hourly")
+  to_field("Command")
+  h.type("make sync")
+  h.press("enter")
+  h.eq(#h.commands(), 0, "nothing sent")
+  h.contains(h.screen(140, 40), "trust")
+  -- Editing an exec automation's command needs the same; its other fields do not.
+  h.press("esc")
+  h.press("j") -- sync-tasks, an exec automation
+  h.press("e")
+  to_field("Command")
+  h.type(" --all")
+  h.press("enter")
+  h.eq(#h.commands(), 0, "a changed command is not sent untrusted")
+  to_field("Command")
+  for _ = 1, 6 do
+    h.press("backspace")
+  end
+  to_field("Name")
+  h.type("-renamed")
+  h.press("enter")
+  local a = only_command().args
+  h.eq(a.name, "sync-tasks-renamed")
+  h.eq(a.command, nil, "an unchanged command is not sent at all")
 end)
 
 -- ── run history and its log ─────────────────────────────────────────────────

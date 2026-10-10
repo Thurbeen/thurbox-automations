@@ -61,6 +61,16 @@ local function editable(row)
   return row ~= nil and row.trigger ~= nil
 end
 
+--- Writing an exec automation's command needs the file to hold `run`: the
+--- heartbeat runs that command, so thurbox gates writing it as it gates running
+--- anything. The pane never calls `run` itself.
+local function trusted()
+  return thurbox ~= nil and thurbox.granted ~= nil and thurbox.granted.run == true
+end
+
+local UNTRUSTED = "writing an exec automation's command needs this pane trusted: "
+  .. "Ctrl+, → ] → t on thurbox-automations (it never runs anything itself)"
+
 local NEWER = "needs a newer thurbox (one whose automation command takes create and edit)"
 
 local cache = {}
@@ -228,6 +238,7 @@ local function open_form(row, edit)
     f.base = field(row.base)
     f.agent = field(row.agent)
     f.command = field(row.command)
+    form.original_command = row.command
     if row.session then
       -- A target that is gone is not quietly swapped for the first session:
       -- the choice starts empty and must be made.
@@ -276,7 +287,15 @@ local function form_options(form)
     opts.timezone = timezone
   end
   if form.kind == "exec" then
-    opts.command = form.fields.command.value
+    local command = form.fields.command.value
+    -- An edit that leaves the command alone does not send it, so renaming or
+    -- rescheduling an exec automation needs no trust.
+    if not (form.id and command == form.original_command) then
+      if not trusted() then
+        return nil, UNTRUSTED
+      end
+      opts.command = command
+    end
   else
     opts.prompt = form.fields.prompt.value
   end
@@ -826,10 +845,17 @@ local function form_panel(form, width)
       children = { { type = "text", len = LABEL + 2, text = { { label } } }, right },
     }
   end
-  local help = {
+  local help = {}
+  if form.kind == "exec" and not trusted() then
+    help[#help + 1] = "Untrusted: " .. UNTRUSTED .. "."
+  end
+  local schedule_help = {
     "Schedule: hourly · daily · weekdays · weekly (with Time, and Weekday for weekly),",
     "cron:<min hour dom month dow>, or at:YYYY-MM-DD HH:MM (UTC). Timezone: an IANA name; empty is local.",
   }
+  for _, line in ipairs(schedule_help) do
+    help[#help + 1] = line
+  end
   children[#children + 1] = { type = "text", len = 1, text = "" }
   for _, line in ipairs(help) do
     children[#children + 1] = {
@@ -1061,6 +1087,9 @@ return {
   -- Reads `thurbox`, `state` and the theme, and writes nothing a render could
   -- not repeat: the cursor's own bookkeeping and two scroll upvalues.
   pure = true,
+  -- Never called: thurbox requires `run` of a file that writes an exec
+  -- automation's command. Untrusted, everything else works.
+  capabilities = { "run" },
   pills = { { action = "automations.toggle", label = "Automations", priority = 20 } },
   events = { "command.done", "command.failed", "interface.reloaded" },
   commands = {
