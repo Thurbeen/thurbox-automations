@@ -21,8 +21,15 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$(cd "${THURBOX_BIN:?set THURBOX_BIN to a directory holding thurbox and thurbox-cli}" && pwd)"
-root="$HERE/.cache/e2e"
-rm -rf "$root"
+if [ -n "${RECORD:-}" ]; then
+  # The settings screen a recording passes through prints the interface
+  # directory, so a recording runs from a neutral path rather than one under
+  # this checkout, which would carry the machine's home directory.
+  root="$(mktemp -d /tmp/thurbox-demo.XXXXXX)"
+else
+  root="$HERE/.cache/e2e"
+  rm -rf "$root"
+fi
 mkdir -p "$root"/{home,config,data,cache,state,xdg-config,xdg-data,screens}
 
 # A socket path must stay under ~100 bytes, so the tmux directory is short and
@@ -33,6 +40,9 @@ cleanup() {
     [ -S "$socket" ] && tmux -S "$socket" kill-server >/dev/null 2>&1 || true
   done
   rm -rf "$sockets"
+  if [ -n "${RECORD:-}" ]; then
+    rm -rf "$root"
+  fi
 }
 trap cleanup EXIT
 
@@ -323,6 +333,10 @@ if [ -n "${RECORD:-}" ]; then
     tmux -L e2e has-session -t e2e 2>/dev/null || break
     sleep 0.25
   done
+  # The fixture's own /home/user is a placeholder; any other home is a leak.
+  if grep -oE "/(home|Users)/[A-Za-z0-9_.-]+" "$root/demo.cast" | grep -qvx "/home/user"; then
+    fail "the recording shows a home directory"
+  fi
   agg --idle-time-limit 1.5 --font-size 14 "$root/demo.cast" "$RECORD"
   echo "recorded $RECORD"
 fi
