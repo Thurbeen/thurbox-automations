@@ -245,6 +245,16 @@ clear_filter
 keep after
 pass "delete asks, no keeps, yes deletes"
 
+# Leaving: the same chord, or Esc, gives the centre back to the agent.
+gone() { ! screen | grep -qF "Automations ("; }
+keys M-a
+wait_cli "alt+a did not leave the pane" gone
+keys M-a
+wait_for "Automations ("
+keys Escape
+wait_cli "esc did not leave the pane" gone
+pass "alt+a and esc both leave"
+
 if [ -n "${RECORD:-}" ]; then
   pause
   keys C-q
@@ -255,4 +265,9 @@ if [ -n "${RECORD:-}" ]; then
   agg --idle-time-limit 1.5 --font-size 14 "$root/demo.cast" "$RECORD"
   echo "recorded $RECORD"
 fi
+# The way out the README names.
+cli plugin remove automations --text >/dev/null || fail "plugin remove automations"
+[ ! -e "$THURBOX_CONFIG_DIR/ui/thurbox-automations" ] || fail "the clone is still there"
+pass "plugin remove takes it out"
+
 echo "e2e: all passed (screens in $root/screens)"
