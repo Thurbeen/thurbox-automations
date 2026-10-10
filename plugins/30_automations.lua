@@ -1200,15 +1200,11 @@ return {
 
   on_event = function(name, payload)
     if name == "interface.reloaded" then
-      -- A reload drops the events still queued, so an answer that was on its
-      -- way never arrives: stop waiting for any of them.
+      -- A reload drops the events still queued, so the `…` marks of writes
+      -- already answered may never clear: forget them. A form stays waiting —
+      -- its command may still be on a worker and answer after the reload, and
+      -- re-enabling Enter would invite saving it twice. Esc leaves it.
       state.pending = nil
-      local form = state.form
-      if form and form.waiting then
-        form.waiting = false
-        form.error = "the interface reloaded before thurbox answered; check the list"
-        state.form = form
-      end
       return
     end
     if payload.kind ~= "automation" then
