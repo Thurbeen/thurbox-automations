@@ -4,8 +4,10 @@
 -- Every read is `thurbox.automations`, which the kernel refreshes from the
 -- database on its own worker; every write is an `automation` command, which a
 -- command worker applies later and answers with `command.done` or
--- `command.failed`. Nothing here runs a program or touches the database, so the
--- pane asks for no capability and a slow disk cannot stall a frame.
+-- `command.failed`. Nothing here runs a program or touches the database, so a
+-- slow disk cannot stall a frame. The pane declares `run` and never calls it:
+-- thurbox requires it of a file that writes an exec automation's command, the
+-- one write that authors something the machine will execute.
 --
 -- Placement: the `center` switch slot, beside the agent pane. The slot shows its
 -- first occupant (the agent) and this pane while it has focus, so it needs no

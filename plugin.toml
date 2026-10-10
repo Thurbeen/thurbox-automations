@@ -12,9 +12,11 @@
 # clone (`require("thurbox-automations.lib.model")`), which is why the module is
 # not listed as a `[[module]]`.
 #
-# It asks for NO capability: every read is `thurbox.automations`, every write an
-# `automation` command. It takes the `center` switch slot beside the agent
-# pane, so it needs no `layout.lua` edit.
+# Every read is `thurbox.automations`, every write an `automation` command. It
+# asks for `run` and never calls it: thurbox requires that grant of a file that
+# writes an exec automation's command. Untrusted, everything else works. It takes
+# the `center` switch slot beside the agent pane, so it needs no `layout.lua`
+# edit.
 name = "automations"
 description = "List, edit, run and inspect thurbox automations and their run history"
 version = "v0.1.0"

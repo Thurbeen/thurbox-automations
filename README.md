@@ -20,7 +20,8 @@ thurbox in a throwaway profile, with seeded automations that run `printf` and
   target, timezone, next and last run). On an older release the pane says
   "needs a newer thurbox" where those actions would be and sends nothing.
 
-Nothing else: no binary, no extension, no capability grant.
+Nothing else: no binary and no extension. Trust is needed for one thing only,
+writing an exec automation's command; see [Permissions](#permissions).
 
 ## Install
 
@@ -105,11 +106,20 @@ goes with the row.
 
 ## Permissions
 
-The pane asks for **no capability**. Every read is `thurbox.automations`, the
-snapshot thurbox refreshes on its own worker. Every change is an `automation`
-command with typed fields, applied by a thurbox command worker, so no name,
-prompt or command you type passes through a shell on its way to the database.
-Rendering never touches the database, the disk or a program.
+Every read is `thurbox.automations`, the snapshot thurbox refreshes on its own
+worker. Every change is an `automation` command with typed fields, applied by a
+thurbox command worker, so no name, prompt or command you type passes through a
+shell on its way to the database. Rendering never touches the database, the disk
+or a program.
+
+The pane declares the **`run` capability and never calls it**. thurbox requires
+it of any pane that writes an exec automation's command, because the heartbeat
+runs that command. Untrusted, the pane lists, inspects, switches on and off,
+runs, deletes, duplicates and edits automations, and creates send and spawn ones;
+creating an exec automation or changing an exec's command says how to trust it:
+`Ctrl+,` → `]` → select `thurbox-automations/plugins/30_automations.lua` → `t`.
+thurbox refuses the write itself too, so the pane's own check is not the only
+one.
 
 What an automation *does* when it fires is thurbox's, and unchanged by this
 pane: a `send` types its prompt into a session, a `spawn` starts a session in a
