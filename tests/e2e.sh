@@ -161,6 +161,40 @@ keys f f Tab
 clear_filter
 pass "run history filters to errors and shows the run's detail"
 
+# Untrusted, an exec automation's command is not written — the pane says how
+# to trust it, and thurbox would refuse it anyway.
+keys n
+wait_for "New automation"
+type_text "untrusted-exec"
+keys Tab Right Right Tab
+type_text "daily"
+keys Tab Tab Tab Tab
+type_text "printf no"
+keys Enter
+wait_for "needs this pane trusted"
+keep untrusted
+keys Escape
+json automation list | grep -q '"untrusted-exec"' && fail "an untrusted pane wrote an exec automation"
+pass "untrusted, an exec command is refused with the way to trust the pane"
+
+# Trust it the way a user does: settings → Interface → t on its row.
+keys F6
+wait_for "Settings"
+keys "]"
+wait_for "30_automations.lua"
+for _ in $(seq 30); do
+  screen | grep -qE "▸ . thurbox-automations/plugins/30_automations.lua" && break
+  keys j
+  sleep 0.1
+done
+keys t
+wait_for "trusted · from thurbox-automations"
+keys Escape
+sleep 0.5
+keys M-a
+wait_for "Automations ("
+pass "trusted through settings → Interface"
+
 # Create an exec automation through the form.
 keys n
 wait_for "New automation"
