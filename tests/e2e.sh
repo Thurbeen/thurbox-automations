@@ -80,6 +80,8 @@ pass "installed and checked in the isolated profile"
 
 # A pane that skips this plugin's own checks and writes an exec automation the
 # moment it draws: thurbox itself must refuse it, because nothing trusted it.
+# A recording leaves it out: its refusal would sit in the pane's status line.
+if [ -z "${RECORD:-}" ]; then
 cat >"$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua" <<'LUA'
 return {
   name = "probe",
@@ -98,6 +100,7 @@ return {
   on_event = function() end,
 }
 LUA
+fi
 
 # ── automations to manage, with a run history ──────────────────────────────
 # A neutral path rather than one under this profile, so no screen or recording
@@ -162,11 +165,13 @@ clear_filter() {
 }
 
 wait_for "Automations" 120
-wait_for "may not write an automation's command"
-sleep 1
-json automation list | grep -q '"probe-exec"' && fail "an untrusted pane wrote an exec automation"
-rm "$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua"
-pass "thurbox refuses an exec command from an untrusted pane"
+if [ -z "${RECORD:-}" ]; then
+  wait_for "may not write an automation's command"
+  sleep 1
+  json automation list | grep -q '"probe-exec"' && fail "an untrusted pane wrote an exec automation"
+  rm "$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua"
+  pass "thurbox refuses an exec command from an untrusted pane"
+fi
 keys M-a
 wait_for "flaky-export"
 wait_for "connection refused"
