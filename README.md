@@ -15,7 +15,7 @@ thurbox in a throwaway profile, with seeded automations that run `printf` and
 - **thurbox 2.56.5 or newer** to load the pane, list automations, show their run
   history, and switch them on and off, run them and delete them.
 - **A thurbox that includes the `automation` create/edit command
-  ([Thurbeen/thurbox#HOSTPR](https://github.com/Thurbeen/thurbox/pull/HOSTPR))**
+  ([Thurbeen/thurbox#1383](https://github.com/Thurbeen/thurbox/pull/1383))**
   to create, edit and duplicate, and to show an automation's definition (prompt,
   target, timezone, next and last run). On an older release the pane says
   "needs a newer thurbox" where those actions would be and sends nothing.
