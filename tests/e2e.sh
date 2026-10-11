@@ -12,24 +12,14 @@
 # profile. Screens are kept under .cache/e2e/ for inspection; the README's
 # screenshots come from them.
 #
-# Needs tmux and git. It installs HEAD: commit before running it.
-#
-# RECORD=media/demo.gif also records the run with asciinema and renders it
-# with agg (both then needed); the narrow-terminal step is left out of a
-# recording, since a cast keeps the size it started at.
+# Needs tmux and git. It installs HEAD: commit before running it. The README's
+# GIF is recorded by scripts/record-demo.sh.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 BIN="$(cd "${THURBOX_BIN:?set THURBOX_BIN to a directory holding thurbox and thurbox-cli}" && pwd)"
-if [ -n "${RECORD:-}" ]; then
-  # The settings screen a recording passes through prints the interface
-  # directory, so a recording runs from a neutral path rather than one under
-  # this checkout, which would carry the machine's home directory.
-  root="$(mktemp -d /tmp/thurbox-demo.XXXXXX)"
-else
-  root="$HERE/.cache/e2e"
-  rm -rf "$root"
-fi
+root="$HERE/.cache/e2e"
+rm -rf "$root"
 mkdir -p "$root"/{home,config,data,cache,state,xdg-config,xdg-data,screens}
 
 # A socket path must stay under ~100 bytes, so the tmux directory is short and
@@ -40,9 +30,6 @@ cleanup() {
     [ -S "$socket" ] && tmux -S "$socket" kill-server >/dev/null 2>&1 || true
   done
   rm -rf "$sockets"
-  if [ -n "${RECORD:-}" ]; then
-    rm -rf "$root"
-  fi
 }
 trap cleanup EXIT
 
@@ -80,8 +67,6 @@ pass "installed and checked in the isolated profile"
 
 # A pane that skips this plugin's own checks and writes an exec automation the
 # moment it draws: thurbox itself must refuse it, because nothing trusted it.
-# A recording leaves it out: its refusal would sit in the pane's status line.
-if [ -z "${RECORD:-}" ]; then
 cat >"$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua" <<'LUA'
 return {
   name = "probe",
@@ -100,7 +85,6 @@ return {
   on_event = function() end,
 }
 LUA
-fi
 
 # ── automations to manage, with a run history ──────────────────────────────
 # A neutral path rather than one under this profile, so no screen or recording
@@ -120,14 +104,7 @@ cli automation run "$(id_of flaky-export)" >/dev/null
 cli automation tick >/dev/null
 
 # ── the TUI, in a terminal tmux holds ──────────────────────────────────────
-if [ -n "${RECORD:-}" ]; then
-  tmux -L e2e new-session -d -s e2e -x 120 -y 34 \
-    "asciinema rec --quiet --overwrite -c thurbox '$root/demo.cast'"
-  pause() { sleep 1.2; }
-else
-  tmux -L e2e new-session -d -s e2e -x 140 -y 40 "thurbox"
-  pause() { :; }
-fi
+tmux -L e2e new-session -d -s e2e -x 140 -y 40 "thurbox"
 screen() { tmux -L e2e capture-pane -p -t e2e; }
 keys() { tmux -L e2e send-keys -t e2e "$@"; }
 type_text() { tmux -L e2e send-keys -t e2e -l "$1"; }
@@ -165,30 +142,25 @@ clear_filter() {
 }
 
 wait_for "Automations" 120
-if [ -z "${RECORD:-}" ]; then
-  wait_for "may not write an automation's command"
-  sleep 1
-  json automation list | grep -q '"probe-exec"' && fail "an untrusted pane wrote an exec automation"
-  rm "$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua"
-  pass "thurbox refuses an exec command from an untrusted pane"
-fi
+wait_for "may not write an automation's command"
+sleep 1
+json automation list | grep -q '"probe-exec"' && fail "an untrusted pane wrote an exec automation"
+rm "$THURBOX_CONFIG_DIR/ui/plugins/99_probe.lua"
+pass "thurbox refuses an exec command from an untrusted pane"
 keys M-a
 wait_for "flaky-export"
 wait_for "connection refused"
-pause
 pass "alt+a opens the pane; the failed run and its output are shown"
 keep normal
 
 # Narrow: the list stacks over the detail.
-if [ -z "${RECORD:-}" ]; then
-  tmux -L e2e resize-window -t e2e -x 72 -y 40
-  sleep 1
-  keep narrow
-  screen | grep -qF "flaky-export" || fail "narrow view lost the list"
-  tmux -L e2e resize-window -t e2e -x 140 -y 40
-  sleep 1
-  pass "narrow view renders"
-fi
+tmux -L e2e resize-window -t e2e -x 72 -y 40
+sleep 1
+keep narrow
+screen | grep -qF "flaky-export" || fail "narrow view lost the list"
+tmux -L e2e resize-window -t e2e -x 140 -y 40
+sleep 1
+pass "narrow view renders"
 
 # Run history: the failed run's whole detail, filtered to errors.
 select_by_filter flaky-export
@@ -197,7 +169,6 @@ wait_for "exit 2: export failed"
 keys f
 wait_for "errors only"
 keep runs
-pause
 keys f f Tab
 clear_filter
 pass "run history filters to errors and shows the run's detail"
@@ -251,10 +222,8 @@ keys Tab
 type_text "printf hello"
 sleep 0.5
 keep form
-pause
 keys Enter
 wait_for "saved e2e-created"
-pause
 created="$(id_of e2e-created)"
 [ "$(field_of "$created" schedule)" != "" ] || fail "created automation has no schedule"
 [ -n "$(field_of "$created" next_run_at)" ] || fail "created automation is not scheduled"
@@ -270,7 +239,6 @@ type_text "true"
 keys Enter
 wait_for "invalid cron expression"
 keep invalid
-pause
 keys Escape
 json automation list | grep -q '"broken"' && fail "an invalid automation was stored"
 pass "an invalid schedule is refused and explained"
@@ -309,7 +277,6 @@ pass "run now marks it due; the tick fires it; the history shows it"
 select_by_filter e2e-created
 keys x
 wait_for "Delete e2e-created"
-pause
 keys n
 sleep 0.5
 json automation list | grep -q '"e2e-created"' || fail "no deleted it"
@@ -331,20 +298,6 @@ keys Escape
 wait_cli "esc did not leave the pane" gone
 pass "alt+a and esc both leave"
 
-if [ -n "${RECORD:-}" ]; then
-  pause
-  keys C-q
-  for _ in $(seq 40); do
-    tmux -L e2e has-session -t e2e 2>/dev/null || break
-    sleep 0.25
-  done
-  # The fixture's own /home/user is a placeholder; any other home is a leak.
-  if grep -oE "/(home|Users)/[A-Za-z0-9_.-]+" "$root/demo.cast" | grep -qvx "/home/user"; then
-    fail "the recording shows a home directory"
-  fi
-  agg --idle-time-limit 1.5 --font-size 14 "$root/demo.cast" "$RECORD"
-  echo "recorded $RECORD"
-fi
 # The way out the README names.
 cli plugin remove automations --text >/dev/null || fail "plugin remove automations"
 [ ! -e "$THURBOX_CONFIG_DIR/ui/thurbox-automations" ] || fail "the clone is still there"
