@@ -260,7 +260,7 @@ local function open_form(row, edit)
     form.original_command = row.command
     -- A target that is gone stays named and unlisted rather than swapped for
     -- another session: the form asks for one to be picked.
-    form.session_id = row.session
+    form.session_id = row.session or form.session_id
     if edit then
       form.id = row.id
     end
@@ -367,7 +367,9 @@ local function cycle_choice(form, key, step)
     local list = sessions()
     if #list > 0 then
       local _, at = form_session(form)
-      form.session_id = list[(at - 1 + step) % #list + 1].id
+      -- From no session picked, right starts at the first and left at the last.
+      local to = at == 0 and (step > 0 and 1 or #list) or (at - 1 + step) % #list + 1
+      form.session_id = list[to].id
     end
   elseif key == "enabled" then
     form.enabled = not form.enabled
@@ -428,6 +430,16 @@ end
 
 -- ── browse actions ─────────────────────────────────────────────────────────
 
+--- Where this thurbox cannot enable an automation properly, the way that can.
+local function enable_by_cli(row)
+  notice(
+    "To re-enable: thurbox-cli automation edit "
+      .. row.id
+      .. " --enabled (this thurbox would leave it unscheduled)",
+    "error"
+  )
+end
+
 local function toggle_enabled()
   local row = selected()
   if not row then
@@ -438,12 +450,7 @@ local function toggle_enabled()
   elseif not editable(row) then
     -- Before the create/edit release, enabling sets the flag and leaves the
     -- next run empty: the row would read as on and never fire.
-    notice(
-      "To re-enable: thurbox-cli automation edit "
-        .. row.id
-        .. " --enabled (this thurbox would leave it unscheduled)",
-      "error"
-    )
+    enable_by_cli(row)
   else
     write(row, "enable", "enabling", { flag = true })
   end
@@ -452,6 +459,10 @@ end
 local function run_now()
   local row = selected()
   if not row then
+    return
+  end
+  if not row.enabled and not editable(row) then
+    enable_by_cli(row)
     return
   end
   if not row.enabled then
@@ -497,9 +508,10 @@ local function edit()
     notice("Editing " .. NEWER .. ".", "error")
     return
   end
-  if pending_of(row) then
+  local pending = pending_of(row)
+  if pending and pending.op ~= "run" then
     -- The form would start from the row as it was before that change, and
-    -- saving would put it back.
+    -- saving would put it back. A run changes no definition.
     notice(row.name .. " has a change on its way; edit it once that lands", "error")
     return
   end

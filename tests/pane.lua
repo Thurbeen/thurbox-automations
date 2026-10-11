@@ -691,6 +691,47 @@ h.test("on an older thurbox each run keeps its own log scroll", function()
   h.contains(h.screen(140, 40), "\n line 2\n", "the second run opens at its top")
 end)
 
+h.test("from no session picked, left picks the last session and right the first", function()
+  local three = {
+    { id = "s1", name = "alpha", repo = "app" },
+    { id = "s2", name = "beta", repo = "app" },
+    { id = "s3", name = "gamma", repo = "app" },
+  }
+  world({ automations = { standup() }, sessions = three })
+  h.press("j")
+  h.press("j")
+  h.press("c") -- standup sends to s1; make it gone
+  world({ automations = { standup() }, sessions = { three[2], three[3] } })
+  to_field("Session")
+  h.press("left")
+  h.contains(h.screen(140, 40), "gamma", "the last one")
+end)
+
+h.test("a duplicate switched to send starts on the first session", function()
+  world()
+  h.press("c") -- nightly-review, a spawn
+  to_field("Kind")
+  h.press("right") -- send
+  h.contains(h.screen(140, 40), "api-refactor", "not left unpicked")
+end)
+
+h.test("a run in flight does not block an edit", function()
+  world()
+  h.press("r")
+  h.commands()
+  h.press("e")
+  h.contains(h.screen(140, 40), "Edit automation", "run now changes no definition")
+end)
+
+h.test("on an older thurbox, run now on a disabled row names the way to enable it", function()
+  local old = standup()
+  old.trigger = nil
+  world({ automations = { old } })
+  h.press("r")
+  h.eq(#h.commands(), 0)
+  h.contains(h.screen(140, 40), "automation edit")
+end)
+
 -- ── run history and its log ─────────────────────────────────────────────────
 
 h.test("run history shows failures and their full detail", function()
