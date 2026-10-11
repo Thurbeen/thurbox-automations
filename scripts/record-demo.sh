@@ -199,17 +199,26 @@ for _ in $(seq 40); do
 done
 [ -n "$deleted" ] || fail "y did not delete old-cleanup"
 keys Escape
-pause 2
-keys M-a
-pause 1.5
+pause 2.5
 keys C-q
 for _ in $(seq 40); do
   tmux -L demo has-session -t demo 2>/dev/null || break
   sleep 0.25
 done
 
-cast="$root/demo.cast"
-[ -s "$cast" ] || fail "no cast recorded"
+[ -s "$root/demo.cast" ] || fail "no cast recorded"
+# Cut where thurbox leaves the alternate screen, so the GIF ends on the pane
+# rather than on the emptied terminal.
+cast="$root/demo-trimmed.cast"
+python3 - "$root/demo.cast" "$cast" <<'PY'
+import json, sys
+with open(sys.argv[1]) as src, open(sys.argv[2], "w") as out:
+    out.write(src.readline())
+    for line in src:
+        if "\x1b[?1049l" in json.loads(line)[2]:
+            break
+        out.write(line)
+PY
 # The fixture's own /home/user is a placeholder; any other home is a leak.
 if grep -oE "/(home|Users)/[A-Za-z0-9_.-]+" "$cast" | grep -qvx "/home/user" ||
   grep -qF -e "$real_home" -e "$real_user" "$cast"; then
