@@ -107,11 +107,12 @@ for _ in 1 2; do
 done
 
 # thurbox creates its database on the first call above; the TUI is not running
-# yet, so this write is conflict-free.
-python3 - "$THURBOX_DATA_DIR" <<'PY'
-import pathlib, sqlite3, sys
-db = next(pathlib.Path(sys.argv[1]).rglob("*.db"))
-with sqlite3.connect(db) as con:
+# yet, so this write is conflict-free. The path is the one thurbox resolves.
+db="$(thurbox-cli config show --json |
+  python3 -c 'import json,sys; print(json.load(sys.stdin)["paths"]["database"])')"
+python3 - "$db" <<'PY'
+import sqlite3, sys
+with sqlite3.connect(sys.argv[1]) as con:
     con.execute(
         "INSERT INTO metadata (key, value) VALUES ('active_theme', 'doom') "
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value"
@@ -134,6 +135,8 @@ wait_for() {
 }
 
 wait_for "Automations"
+# The top band names the active theme.
+wait_for "Doom"
 pause 2
 keys M-a
 wait_for "flaky-export"
@@ -186,10 +189,15 @@ keys x
 wait_for "Delete old-cleanup"
 pause 2
 keys y
+deleted=
 for _ in $(seq 40); do
-  thurbox-cli automation list --json | grep -q '"old-cleanup"' || break
+  if ! thurbox-cli automation list --json | grep -q '"old-cleanup"'; then
+    deleted=1
+    break
+  fi
   sleep 0.25
 done
+[ -n "$deleted" ] || fail "y did not delete old-cleanup"
 keys Escape
 pause 2
 keys M-a
