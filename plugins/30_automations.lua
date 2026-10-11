@@ -154,6 +154,11 @@ local function write(row, op, label, opts)
   state.notice = nil
 end
 
+local function pending_of(row)
+  local pending = state.pending
+  return pending and row and pending["#" .. row.id] or nil
+end
+
 -- ── the form ───────────────────────────────────────────────────────────────
 
 local function field(value)
@@ -204,6 +209,18 @@ local function focused_row(form)
   return list[math.max(1, math.min(form.focus or 1, #list))]
 end
 
+--- The session a form names, by id, and its position in `thurbox.sessions`;
+--- nil when no session has that id. By id rather than by position, so a list
+--- that changes under an open form never moves a send to another session.
+local function form_session(form)
+  for index, session in ipairs(sessions()) do
+    if session.id == form.session_id then
+      return session, index
+    end
+  end
+  return nil, 0
+end
+
 --- A form for a new automation, or prefilled from `row` — an edit when `edit`,
 --- a duplicate otherwise.
 local function open_form(row, edit)
@@ -212,7 +229,7 @@ local function open_form(row, edit)
     kind = "spawn",
     focus = 1,
     enabled = true,
-    session = 1,
+    session_id = sessions()[1] and sessions()[1].id or nil,
     fields = {
       name = field(""),
       trigger = field(""),
@@ -241,16 +258,8 @@ local function open_form(row, edit)
     f.agent = field(row.agent)
     f.command = field(row.command)
     form.original_command = row.command
-    if row.session then
-      -- A target that is gone is not quietly swapped for the first session:
-      -- the choice starts empty and must be made.
-      form.session = 0
-      for index, session in ipairs(sessions()) do
-        if session.id == row.session then
-          form.session = index
-        end
-      end
-    end
+    -- A target that is gone stays named and unlisted rather than swapped for
+    -- another session: the form asks for one to be picked.
     form.session_id = row.session
     if edit then
       form.id = row.id
@@ -303,7 +312,7 @@ local function form_options(form)
   end
   if not form.id then
     if form.kind == "send" then
-      local session = sessions()[form.session or 1]
+      local session = form_session(form)
       if not session then
         if #sessions() > 0 then
           return nil, "pick a session to send to with ◂ ▸"
@@ -355,8 +364,11 @@ local function cycle_choice(form, key, step)
     form.kind = KINDS[(at - 1 + step) % #KINDS + 1]
     form.focus = 2
   elseif key == "session" then
-    local count = math.max(1, #sessions())
-    form.session = ((form.session or 1) - 1 + step) % count + 1
+    local list = sessions()
+    if #list > 0 then
+      local _, at = form_session(form)
+      form.session_id = list[(at - 1 + step) % #list + 1].id
+    end
   elseif key == "enabled" then
     form.enabled = not form.enabled
   end
@@ -423,6 +435,15 @@ local function toggle_enabled()
   end
   if row.enabled then
     write(row, "disable", "disabling", { flag = false })
+  elseif not editable(row) then
+    -- Before the create/edit release, enabling sets the flag and leaves the
+    -- next run empty: the row would read as on and never fire.
+    notice(
+      "To re-enable: thurbox-cli automation edit "
+        .. row.id
+        .. " --enabled (this thurbox would leave it unscheduled)",
+      "error"
+    )
   else
     write(row, "enable", "enabling", { flag = true })
   end
@@ -476,6 +497,12 @@ local function edit()
     notice("Editing " .. NEWER .. ".", "error")
     return
   end
+  if pending_of(row) then
+    -- The form would start from the row as it was before that change, and
+    -- saving would put it back.
+    notice(row.name .. " has a change on its way; edit it once that lands", "error")
+    return
+  end
   open_form(row, true)
 end
 
@@ -511,10 +538,10 @@ local function scroll_log(step)
   local lines, total =
     model.wrap(run.detail, last_log_width, LOG_LIMIT, widgets.len, widgets.keep_left)
   local drawn = #lines + (total > LOG_LIMIT and 1 or 0)
-  local offset = state.log_for == run.id and (state.log or 0) or 0
+  local offset = state.log_for == run_id(run) and (state.log or 0) or 0
   local page = math.max(1, last_log_rows - 1)
   offset = math.max(0, math.min(drawn - last_log_rows, offset + step * page))
-  state.log, state.log_for = offset, run.id
+  state.log, state.log_for = offset, run_id(run)
 end
 
 local function filter_key(key)
@@ -546,11 +573,6 @@ local function kv(label, value, width, fg)
     span(" " .. widgets.pad(label, LABEL), theme.muted),
     span(widgets.truncate(value or "", math.max(1, width - LABEL - 2)), fg or theme.text),
   }
-end
-
-local function pending_of(row)
-  local pending = state.pending
-  return pending and row and pending["#" .. row.id] or nil
 end
 
 local function list_row(row, width)
@@ -775,7 +797,7 @@ local function detail_panel(row, width, height, focused)
       lines[#lines + 1] = "… " .. (total - LOG_LIMIT) .. " more lines not shown"
     end
     last_log_rows, last_log_width = left, inner_w - 1
-    local offset = state.log_for == run.id and (state.log or 0) or 0
+    local offset = state.log_for == run_id(run) and (state.log or 0) or 0
     offset = math.max(0, math.min(offset, #lines - left))
     local shown = {}
     for index = offset + 1, math.min(#lines, offset + left) do
@@ -806,7 +828,7 @@ local function form_panel(form, width)
     if row.key == "kind" then
       value = form.kind .. (row.static and "" or "   ◂ ▸")
     elseif row.key == "session" then
-      local session = sessions()[form.session or 1]
+      local session = form_session(form)
       if row.static then
         value = (model.session_label(form.session_id, sessions()))
       else
