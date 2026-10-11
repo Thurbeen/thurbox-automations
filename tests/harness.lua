@@ -6,8 +6,8 @@
 -- screen. Only what the kernel injects is faked: `thurbox` (the snapshot),
 -- `state` and `store` (copy-on-read, as in the VM), `command` (recorded, never
 -- applied) and `text` (column arithmetic, `tests/text.lua`). `run` is never
--- defined: the pane asks for no capability, and a call to it would fail here
--- exactly as it would in the VM.
+-- defined: the pane declares it but never calls it, and a call would fail here
+-- exactly as it would in an untrusted VM.
 --
 -- Keys are dispatched as the kernel dispatches them: a chord the pane DECLARED
 -- goes to `on_action` first, and reaches `on_key` only when that declines.

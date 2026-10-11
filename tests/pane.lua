@@ -629,6 +629,109 @@ h.test("untrusted, an exec automation is not written and the pane says how to tr
   h.eq(a.command, nil, "an unchanged command is not sent at all")
 end)
 
+-- ── found in the final-head review ────────────────────────────────────────
+
+h.test("an older thurbox does not re-enable an automation it would never fire", function()
+  -- Before the create/edit release, enabling sets the flag and leaves
+  -- next_run_at empty, so the row reads as on and is never scheduled.
+  local old = standup()
+  old.trigger = nil
+  world({ automations = { old } })
+  h.press("space")
+  h.eq(#h.commands(), 0, "nothing sent")
+  h.contains(h.screen(140, 40), "automation edit")
+  -- Disabling still works there.
+  local on = sync()
+  on.trigger = nil
+  world({ automations = { on } })
+  h.press("space")
+  h.eq(only_command().args.flag, false)
+end)
+
+h.test("a send keeps the session it names when the session list changes", function()
+  local three = {
+    { id = "s1", name = "alpha", repo = "app" },
+    { id = "s2", name = "beta", repo = "app" },
+    { id = "s3", name = "gamma", repo = "app" },
+  }
+  local send = standup()
+  send.session = "s2"
+  world({ automations = { send }, sessions = three })
+  h.press("c")
+  world({ automations = { send }, sessions = { three[2], three[3] } })
+  h.press("enter")
+  h.eq(only_command().args.session, "s2", "still beta, not whatever took its index")
+end)
+
+h.test("an edit is not opened over a change still on its way", function()
+  world()
+  h.press("space")
+  h.commands()
+  h.press("e")
+  h.absent(h.screen(140, 40), "Edit automation", "the edit would carry the old enabled flag")
+  h.event("command.done", { kind = "automation", subject = "#3" })
+  h.press("e")
+  h.contains(h.screen(140, 40), "Edit automation")
+end)
+
+h.test("on an older thurbox each run keeps its own log scroll", function()
+  local noisy = sync()
+  local lines = {}
+  for i = 1, 300 do
+    lines[i] = "line " .. i
+  end
+  noisy.runs = {
+    { started_at = h.NOW - 1000, status = "error", detail = table.concat(lines, "\n") },
+    { started_at = h.NOW - 2000, status = "error", detail = table.concat(lines, "\n") },
+  }
+  world({ automations = { noisy } })
+  h.press("tab")
+  h.press("pagedown")
+  h.press("j")
+  h.contains(h.screen(140, 40), "\n line 2\n", "the second run opens at its top")
+end)
+
+h.test("from no session picked, left picks the last session and right the first", function()
+  local three = {
+    { id = "s1", name = "alpha", repo = "app" },
+    { id = "s2", name = "beta", repo = "app" },
+    { id = "s3", name = "gamma", repo = "app" },
+  }
+  world({ automations = { standup() }, sessions = three })
+  h.press("j")
+  h.press("j")
+  h.press("c") -- standup sends to s1; make it gone
+  world({ automations = { standup() }, sessions = { three[2], three[3] } })
+  to_field("Session")
+  h.press("left")
+  h.contains(h.screen(140, 40), "gamma", "the last one")
+end)
+
+h.test("a duplicate switched to send starts on the first session", function()
+  world()
+  h.press("c") -- nightly-review, a spawn
+  to_field("Kind")
+  h.press("right") -- send
+  h.contains(h.screen(140, 40), "api-refactor", "not left unpicked")
+end)
+
+h.test("a run in flight does not block an edit", function()
+  world()
+  h.press("r")
+  h.commands()
+  h.press("e")
+  h.contains(h.screen(140, 40), "Edit automation", "run now changes no definition")
+end)
+
+h.test("on an older thurbox, run now on a disabled row names the way to enable it", function()
+  local old = standup()
+  old.trigger = nil
+  world({ automations = { old } })
+  h.press("r")
+  h.eq(#h.commands(), 0)
+  h.contains(h.screen(140, 40), "automation edit")
+end)
+
 -- ── run history and its log ─────────────────────────────────────────────────
 
 h.test("run history shows failures and their full detail", function()
