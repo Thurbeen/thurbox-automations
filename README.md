@@ -1,176 +1,106 @@
 # thurbox-automations
 
-A pane for thurbox's automations: list them, see when each fires next and how
-its recent runs went, read a failed run's output, and create, edit, duplicate,
-switch on and off, run or delete one, all without leaving the interface.
+A [thurbox](https://github.com/Thurbeen/thurbox) pane for your scheduled automations.
 
-![The automations pane: the list, a failed exec run and its output, a new automation created through the form, an invalid schedule refused, and a delete confirmed](media/demo.gif)
+[![Check](https://github.com/Thurbeen/thurbox-automations/actions/workflows/check.yml/badge.svg)](https://github.com/Thurbeen/thurbox-automations/actions/workflows/check.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-The GIF and the captures below are recorded by `tests/e2e.sh` from a real
-thurbox in a throwaway profile, with seeded automations that run `printf` and
-`exit`.
+![The automations pane in thurbox's Doom theme: the list, a failed run's output filtered to errors, run now, an automation switched off, and a delete confirmed](media/demo.gif)
 
-## Requirements
+- **See every automation at once** — on or off, its schedule, its next run and
+  how its last run ended.
+- **Find out why a run failed** — each run's output, filtered to errors in one key.
+- **Manage them in place** — run now, switch on or off, create, edit, duplicate
+  or delete, without leaving thurbox.
 
-- **thurbox 2.56.5 or newer** to load the pane, list automations, show their run
-  history, and switch them on and off, run them and delete them.
-- **A thurbox that includes the `automation` create/edit command
-  ([Thurbeen/thurbox#1383](https://github.com/Thurbeen/thurbox/pull/1383))**
-  to create, edit and duplicate, and to show an automation's definition (prompt,
-  target, timezone, next and last run). On an older release the pane says
-  "needs a newer thurbox" where those actions would be and sends nothing.
+The GIF is thurbox v2.56.5 running synthetic automations. That release publishes no
+next run or definition, hence the "needs a newer thurbox" line in the detail.
 
-Nothing else: no binary and no extension. Trust is needed for one thing only,
-writing an exec automation's command; see [Permissions](#permissions).
-
-## Install
+## Installation
 
 ```bash
 thurbox-cli plugin install git+https://github.com/Thurbeen/thurbox-automations
 thurbox-cli plugin check
 ```
 
-`install` clones this repository into your interface directory as
-`thurbox-automations/` and records it in `plugins.toml`; `plugin update` moves
-it forward and `plugin remove automations` takes it out. Nothing runs at
-install time.
+Needs **thurbox 2.56.5 or newer**. Creating, editing and duplicating, and showing
+an automation's next run, prompt and target, need a thurbox with the `automation`
+create/edit command ([Thurbeen/thurbox#1383](https://github.com/Thurbeen/thurbox/pull/1383));
+until then the pane says so and sends nothing.
 
-## Where it is
+`thurbox-cli plugin update` moves it forward; `thurbox-cli plugin remove automations`
+takes it out.
 
-It takes the `center` slot beside the agent pane, as a switch-slot alternate:
-the agent stays what the centre shows, and this pane is drawn while it has
-focus. So there is **no `layout.lua` edit**. Three ways in:
+## Getting Started
 
-- **`Alt+A`** opens it and, pressed again, goes back where you were. It is a
-  global chord, so it works from inside a focused terminal. Every F-key is
-  already taken by thurbox or another official pane.
-- The **Automations** pill in the action band.
-- **`Ctrl+P`** → "Automations: show or leave the automations pane" or
-  "Automations: create an automation".
+1. **`Alt+A`** opens the pane (or the **Automations** pill, or `Ctrl+P` →
+   "Automations"). `Alt+A` again or `Esc` goes back.
+2. **Read the list.** `j` / `k` move; the detail follows the selected row.
+3. **Check its runs.** `Tab` moves into the run history and shows the selected run's
+   output; `f` cycles all runs, errors only and skipped only.
+4. **Act on it.** `r` runs it now, `Space` switches it on or off, `x` deletes it
+   after a `y`.
 
-`Esc` also leaves, as it does for any pane. Rebind any of its keys in settings
-(`Ctrl+,`); the footer hints follow the rebinding.
+The pane takes the `center` slot beside the agent, so no `layout.lua` edit is
+needed. Below 100 columns the list stacks over the detail.
 
-At 100 columns and wider the list and the detail sit side by side; narrower,
-the list stacks over the detail:
+## Keys
 
-```text
-┏ ▸ Automations (3) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
-┃ ● flaky-export               cron 0 0 1 1 *                in 82d  ✗ ┃
-┃ ● sync-tasks                 cron 0 0 1 1 *                in 82d  ✓ ┃
-┃ ○ nightly-review             weekdays 09:00                off       ┃
-┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
-╭ flaky-export ────────────────────────────────────────────────────────╮
-│ flaky-export  ● enabled                                              │
-│ Schedule   cron 0 0 1 1 * · local time                               │
-│ Target     $ echo 'export failed: connection refused' >&2; exit 2    │
-│ Runs on    this machine, from its heartbeat                          │
-│ Next run   in 82d · 2026-12-31 23:00 UTC                             │
-│ Last run   now · 2026-10-10 16:49 UTC                                │
-│── Runs · 1 run ──────────────────────────────────────────────────────│
-│ ✗ now      exit 2: export failed: connection refused                 │
-│── Run #2 · error · 2026-10-10 16:49 UTC ─────────────────────────────│
-│ exit 2: export failed: connection refused                            │
-```
-
-## What it does
-
-| Key | In the list |
+| Key | Does |
 |---|---|
 | `j` `k` `↑` `↓` | move through the list, or through the runs after `Tab` |
-| `Tab` / `Enter` | move between the list and the run history |
-| `n` | new automation (spawn, send or exec) |
-| `e` | edit the selected one: name, schedule, timezone, prompt (or an exec's command), enabled |
-| `c` | duplicate it into a new form, disabled so the copy does not fire twice |
-| `Space` | switch it on or off |
-| `r` | run now: marks it due, and this machine's heartbeat fires it within a minute |
-| `x` / `Delete` | delete it and its run history, after a `y` |
+| `Tab` / `Enter` | switch between the list and the run history |
 | `/` | filter by name, schedule or target; `Esc` clears it |
-| `f` | show all runs, only errors, or only skipped runs |
+| `f` | all runs, errors only, skipped only |
 | `PgDn` / `PgUp` | scroll the selected run's output |
+| `r` | run now: this machine's heartbeat fires it within a minute |
+| `Space` | switch on or off |
+| `n` / `e` / `c` | new, edit, duplicate (the copy starts disabled) |
+| `x` / `Delete` | delete it and its run history, after a `y` |
 
-In the form, `Tab` and the arrows move between fields, `◂ ▸` change a choice,
-`Enter` saves and `Esc` cancels. A schedule is a preset (`hourly`, `daily`,
-`weekdays` or `weekly`, with Time and, for `weekly`, Weekday), `cron:<expr>`, or
-`at:YYYY-MM-DD HH:MM` in UTC for a one-shot. thurbox checks every field; when
-it refuses one, the form stays open with what you typed and its reason, such
-as an invalid cron expression or an unknown timezone. `Ctrl+U` is thurbox's
-global restore chord and never reaches a field, so empty one with backspace or
-`Ctrl+W`.
+In the form, `Tab` moves between fields, `◂ ▸` change a choice, `Enter` saves and
+`Esc` cancels. A schedule is `hourly`, `daily`, `weekdays`, `weekly`, `cron:<expr>`
+or `at:YYYY-MM-DD HH:MM` (UTC). Rebind any key in settings (`Ctrl+,`).
 
-Each list row shows whether the automation is on, its schedule, when it fires
-next, and how its last run ended. A write in flight shows as `…`, and its
-failure is reported in the pane. A selection that disappears because another
-pane, the CLI or a run deleted it is never acted on: a pending delete question
-goes with the row.
+## Trust
 
-## Permissions
+The pane reads the snapshot thurbox publishes and writes only through thurbox's
+typed `automation` command: no shell, file or database access from Lua.
+Everything works untrusted except writing an **exec** automation's command,
+which your machine will run. To allow that: `Ctrl+,` → `]` → select
+`thurbox-automations/plugins/30_automations.lua` → `t`.
 
-Every read is `thurbox.automations`, the snapshot thurbox refreshes on its own
-worker. Every change is an `automation` command with typed fields, applied by a
-thurbox command worker, so no name, prompt or command you type passes through a
-shell on its way to the database. Rendering never touches the database, the disk
-or a program.
+## Limits
 
-The pane declares the **`run` capability and never calls it**. thurbox requires
-it of any pane that writes an exec automation's command, because the heartbeat
-runs that command. Untrusted, the pane lists, inspects, switches on and off,
-runs, deletes, duplicates and edits automations, and creates send and spawn ones;
-creating an exec automation or changing an exec's command says how to trust it:
-`Ctrl+,` → `]` → select `thurbox-automations/plugins/30_automations.lua` → `t`.
-thurbox refuses the write itself too, so the pane's own check is not the only
-one.
+These are thurbox's, and the pane shows them rather than hiding them:
 
-What an automation *does* when it fires is thurbox's, and unchanged by this
-pane: a `send` types its prompt into a session, a `spawn` starts a session in a
-repository, and an `exec` runs its command through `sh -c` (`cmd /C` on
-Windows). Writing an exec automation is writing a command your machine will
-run, so treat this pane like `thurbox-cli automation create`.
+- **No cancel** — thurbox does not track a run in flight.
+- **Ten runs of history** — `thurbox-cli automation runs <id> --limit N` reads
+  further back.
+- **Exec output is a tail** — the last 500 characters of stdout and of stderr.
+- **No retargeting** — an edit keeps the target; duplicate it to change one.
+- **Run now needs it on** — thurbox would switch it on, so the pane asks first.
 
-## What it cannot do
+## Documentation
 
-These are thurbox's limits, stated rather than papered over:
+- [Automations](https://thurbox.thurbeen.eu/docs/features.html#automations) —
+  triggers, actions and the heartbeat that fires them.
+- [Writing a pane](https://github.com/Thurbeen/thurbox/blob/main/docs/PLUGINS.md)
+  and the [plugin catalog](https://thurbox.thurbeen.eu/plugins.html).
 
-- **No cancel.** thurbox does not track a run while it is in flight, so there is
-  nothing to cancel.
-- **History is the ten most recent runs** per automation, as the snapshot
-  carries them. `thurbox-cli automation runs <id> --limit N` reads further back.
-- **An exec run's "log" is a tail.** thurbox records the last 500 characters of
-  its stdout and of its stderr. The pane shows all of that, wrapped and
-  scrollable, and draws at most 200 lines of any run.
-- **No retargeting.** An edit keeps the target: the session, or the repository,
-  branch, base and agent. Duplicate it and change the copy instead. A multi-repo
-  spawn cannot be duplicated from the pane, because the create command carries
-  no extra repositories; use `thurbox-cli automation create --add-repo`.
-- **Run now switches a disabled automation on** in thurbox, so the pane refuses
-  it on a disabled one and asks you to enable it first.
-
-## Machines and platforms
-
-Automations live in this machine's database and are fired by this machine's
-heartbeat (`thurbox-cli automation tick`, armed by thurbox when the
-`[features] automations` setting is on). A `send` can target a session on any
-host thurbox reaches; a `spawn` and an `exec` run here. So the pane has no host
-picker. When the feature is switched off, the pane says that nothing fires.
-
-The pane is plain Lua with no platform code. It is tested on Linux, and CI
-loads it on Windows with native thurbox. Exec commands run in the platform
-shell, so a command you write has to suit that machine.
-
-## Development
+## Contributing
 
 ```bash
-THURBOX_REPO=/path/to/thurbox scripts/check.sh     # the gate: lint, tests, isolated install
-THURBOX_BIN=/path/to/thurbox/target/debug tests/e2e.sh   # the pane in a real thurbox
-RECORD=media/demo.gif THURBOX_BIN=… tests/e2e.sh         # and re-record the GIF
+THURBOX_REPO=/path/to/thurbox scripts/check.sh        # the gate: lint, tests, isolated install
+THURBOX_BIN=/path/to/thurbox/bin tests/e2e.sh         # the pane in a real thurbox
+scripts/record-demo.sh                                # re-record media/demo.gif
 ```
 
-`tests/pane.lua` drives the pane's handlers against the interface's real `lib/`
-with a faked snapshot. `tests/e2e.sh` installs the committed plugin into a
-throwaway profile (its own HOME, config, data and tmux socket directory), seeds
-automations through `thurbox-cli`, drives the TUI with real key presses, and
-checks the database after each step.
+`scripts/record-demo.sh` installs the committed plugin into a throwaway profile,
+seeds synthetic automations, sets the built-in `doom` theme and drives thurbox
+with real keys under asciinema and agg. It refuses to write a GIF that shows a
+home directory or the recording user's name.
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
