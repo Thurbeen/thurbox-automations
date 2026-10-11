@@ -1,0 +1,30 @@
+# The automations plugin: a pane to list, inspect, create, edit, switch on and
+# off, run and delete thurbox's automations, with each one's recent runs.
+#
+# It is more than one file — the pane and the module it requires — so it is
+# installed by CLONING it:
+#
+#     thurbox-cli plugin install git+https://github.com/Thurbeen/thurbox-automations
+#
+# The clone lands at `<interface dir>/thurbox-automations/`, keeps its `.git`
+# (so `update` is a fetch and your edits are protected), and `pane.source`
+# below names the entry point inside it. The pane reaches its module inside the
+# clone (`require("thurbox-automations.lib.model")`), which is why the module is
+# not listed as a `[[module]]`.
+#
+# Every read is `thurbox.automations`, every write an `automation` command. It
+# asks for `run` and never calls it: thurbox requires that grant of a file that
+# writes an exec automation's command. Untrusted, everything else works. It takes
+# the `center` switch slot beside the agent pane, so it needs no `layout.lua`
+# edit.
+name = "automations"
+description = "List, edit, run and inspect thurbox automations and their run history"
+version = "v0.1.0"
+
+# Advisory, as thurbox records it. Listing, switching on and off, running,
+# deleting and the run history work from this release on; creating and editing
+# need the release that adds `automation` create/edit, and the pane says so
+# rather than failing on an older one (README.md, "Requirements").
+requires_thurbox = ">=2.56.5"
+
+pane = { source = "plugins/30_automations.lua", path = "plugins/30_automations.lua" }

@@ -1,0 +1,21 @@
+# How this repository declares its gate to the publish skill.
+version: 1
+forge: github
+base: main
+review:
+  rules:
+    - README.md
+gate:
+  - name: check
+    run: bash scripts/check.sh
+    fix: stylua plugins lib tests
+    instructions: >-
+      Needs lua5.4 (LUA=lua5.4 where `lua` is newer), selene, stylua, rumdl,
+      git and thurbox-cli on PATH, and THURBOX_REPO naming a directory that
+      holds thurbox's ui/ at the tag CI pins (THURBOX_TAG in
+      .github/workflows/check.yml), e.g. `git archive <tag> ui thurbox.yml`
+      extracted under .cache/thurbox. scripts/loads.sh installs HEAD, so the
+      gate checks committed work.
+ci:
+  required: true
+  timeout: 15m

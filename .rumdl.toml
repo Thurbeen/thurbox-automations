@@ -1,0 +1,7 @@
+# Markdown lint, matching the thurbox repository's conventions so prose here
+# reads the same as prose there.
+
+[MD013]
+line_length = 100
+tables = false
+code_blocks = false

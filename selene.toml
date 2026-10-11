@@ -1,0 +1,18 @@
+# Static analysis against the plugin VM's real standard library.
+#
+# `thurbox.yml` beside this file is a COPY of the one in the thurbox release CI
+# pins (THURBOX_TAG in .github/workflows/check.yml): the five stdlib tables the
+# kernel grants plus its injected globals, and nothing else. Reaching for `os`
+# or `io` in the pane is therefore a lint error here rather than "attempt to
+# index a nil value" when somebody opens it. CI fails when the copy drifts.
+std = "thurbox"
+
+# `tests/` runs under a real Lua outside the VM and uses `os`, `io` and `_G` on
+# purpose; checking it against the sandbox would check the wrong thing.
+exclude = ["tests/**"]
+
+[lints]
+unused_variable = "warn"
+shadowing = "allow"
+undefined_variable = "deny"
+unscoped_variables = "deny"
