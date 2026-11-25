@@ -1,5 +1,12 @@
 # thurbox-automations
 
+> [!WARNING]
+> **Archived.** thurbox v3 removed automations: `thurbox.automations`, the
+> `automation` command and `thurbox-cli automation`. This pane reads and writes
+> nothing else, so it works only on thurbox 2.x. Schedule work with a Fleet v3
+> [CronTask](https://github.com/Thurbeen/thurbox/blob/main/docs/fleet/resources/cron-task.md) instead, and see
+> [Migrating to thurbox v3](https://github.com/Thurbeen/thurbox/blob/main/docs/migrating-to-v3.md).
+
 A [thurbox](https://github.com/Thurbeen/thurbox) pane for your scheduled automations.
 
 [![Check](https://github.com/Thurbeen/thurbox-automations/actions/workflows/check.yml/badge.svg)](https://github.com/Thurbeen/thurbox-automations/actions/workflows/check.yml)
